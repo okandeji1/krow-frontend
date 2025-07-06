@@ -34,3 +34,15 @@ export const connect = async () => {
     throw new Error("No ethereum object connected!");
   }
 };
+
+export const formatTimestamp = (bigintTs: bigint): string =>{
+  const date = new Date(Number(bigintTs) * 1000);
+  return date.toLocaleString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+}

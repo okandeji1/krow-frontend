@@ -1,197 +1,248 @@
 <template>
-  <UContainer class="py-10">
-    <UCard>
-      <template #header>
-        <h1 class="text-2xl font-bold">🚀 Crowdfunding DApp</h1>
-      </template>
+  <navbar />
+  <section
+    class="min-h-screen flex flex-col items-center justify-center text-white p-6 space-y-8"
+    style="
+      background: radial-gradient(
+          at 0% 0%,
+          hsla(253, 16%, 7%, 1) 0,
+          transparent 50%
+        ),
+        radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
+        radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+    "
+  >
+    <div class="text-center max-w-2xl mx-auto space-y-4">
+      <h1 class="text-4xl font-bold mb-2">Crowd Funding</h1>
+      <p class="leading-relaxed">
+        Together, we can create meaningful change. This campaign is dedicated to
+        supporting vital initiatives that uplift communities, provide essential
+        resources, and build a brighter future for those in need. Every
+        contribution, no matter the size, brings us closer to our goal and helps
+        make a real difference. Join us on this journey — your support matters,
+        and together we can achieve something extraordinary.
+      </p>
+    </div>
 
-      <div class="space-y-4">
-        <UProgress :value="progress" size="lg" color="primary" />
-
-        <div class="flex justify-between text-sm">
-          <span>Goal: {{ formatEther(fundingGoal) }} ETH</span>
-          <span>Contributed: {{ formatEther(totalContributed) }} ETH</span>
-          <span>Time Left: {{ timeLeft }}s</span>
-        </div>
-
-        <UInput
-          v-model="contributeAmount"
-          placeholder="ETH to contribute"
-          type="number"
-          class="w-full"
-        />
-        <UButton block color="primary">Contribute</UButton>
-
-        <div class="grid grid-cols-2 gap-2">
-          <UButton color="green">Withdraw (Owner)</UButton>
-          <UButton color="yellow" >Refund</UButton>
-        </div>
-
-        <div class="grid grid-cols-2 gap-2">
-          <UButton color="red">Pause</UButton>
-          <UButton color="purple" >Resume</UButton>
+    <div class="flex flex-col items-center">
+      <div class="relative mb-2">
+        <svg class="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
+          <circle
+            cx="50"
+            cy="50"
+            r="45"
+            stroke="white"
+            stroke-width="10"
+            fill="transparent"
+            opacity="0.2"
+          />
+          <circle
+            cx="50"
+            cy="50"
+            r="45"
+            stroke="white"
+            stroke-width="10"
+            fill="transparent"
+            stroke-dasharray="283"
+            :stroke-dashoffset="dashOffset"
+            stroke-linecap="round"
+          />
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <span class="text-2xl font-bold">{{ progress }}%</span>
         </div>
       </div>
-    </UCard>
-  </UContainer>
+      <p>Complete</p>
+    </div>
+
+    <div class="flex justify-center space-x-8 text-lg font-semibold">
+      <div>
+        <p>Contributed</p>
+        <p>{{ formatEther(totalContributed) }} ETH</p>
+      </div>
+      <div>
+        <p>Goal</p>
+        <p>{{ formatEther(fundingGoal) }} ETH</p>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap justify-center space-x-2 mt-4">
+      <UForm
+        :schema="schema"
+        :state="state"
+        @submit="handContribute"
+        class="space-y-4"
+      >
+        <UInput
+          highlight
+          color="neutral"
+          size="xl"
+          v-model="state.amount"
+          type="number"
+          placeholder="Enter amount"
+          class="rounded-lg p-2 text-black"
+        />
+        <UButton
+          type="submit"
+          class="cursor-pointer"
+          color="neutral"
+          icon="i-lucide-rocket"
+          size="md"
+          variant="ghost"
+          :loading="loading"
+        />
+      </UForm>
+    </div>
+
+    <!-- Only Owner -->
+    <div v-if="isOwner">
+      <div class="grid grid-cols-2 gap-2">
+        <UButton color="green">Withdraw (Owner)</UButton>
+        <UButton color="yellow">Refund</UButton>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <UButton color="red">Pause</UButton>
+        <UButton color="purple">Resume</UButton>
+      </div>
+    </div>
+
+    <div class="w-full max-w-2xl mt-8">
+      <UCard>
+        <UTable :data="contributors" :columns="columns" sticky class="flex-1">
+          <template #amount-cell="{ row }">
+            <span>{{ formatEther(row.original.amount) }}</span>
+          </template>
+        </UTable>
+      </UCard>
+    </div>
+  </section>
+  <Footer />
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, onUnmounted } from 'vue'
-import { ethers, BrowserProvider } from 'ethers'
+import { ref, onMounted, computed, onUnmounted, reactive } from "vue";
+import { ethers } from "ethers";
+import { useAccountStore } from "~/stores/account";
+import { formatTimestamp, getEthereumContract } from "~/utils/utility";
+import { connectAccount } from "~/composables/accountAuth";
+import Joi from "joi";
+import { contribute } from "~/composables/contract";
+import type { FormSubmitEvent } from "@nuxt/ui/.";
+
+const accountStore = useAccountStore();
 
 // @ts-ignore
-const toast = useToast()
-const history = ref<{ type: string; from: string; amount: string; tx: string }[]>([])
+const toast = useToast();
 
-const fundingGoal = ref('0')
-const totalContributed = ref('0')
-const timeLeft = ref(0)
-const contributeAmount = ref<number>()
+const fundingGoal = ref("0");
+const totalContributed = ref("0");
+const timeLeft = ref(0);
+const contributors = ref([]);
+const columns = [
+  {
+    accessorKey: "id",
+    header: "#",
+    cell: ({ row }: { row: { index: number } }) => row.index + 1,
+  },
+  {
+    accessorKey: "contributor",
+    header: "Contributors",
+    cell: ({ row }: { row: { getValue: (key: string) => any } }) =>
+      row.getValue("contributor"),
+  },
+  {
+    accessorKey: "amount",
+    header: "Amount",
+    cell: ({ row }: { row: { getValue: (key: string) => any } }) =>
+      row.getValue("amount"),
+  },
+  {
+    accessorKey: "timestamp",
+    header: "Date",
+    cell: ({ row }: { row: { getValue: (key: string) => any } }) => {
+      return formatTimestamp(row.getValue("timestamp"));
+    },
+  },
+];
+const loading = ref(false);
 
-const progress = computed(() => {
-  if (fundingGoal.value === '0') return 0
-  const goal = Number(ethers.formatEther(fundingGoal.value))
-  const total = Number(ethers.formatEther(totalContributed.value))
-  return Math.min((total / goal) * 100, 100)
-})
+const schema = Joi.object({
+  amount: Joi.number().positive().greater(0).required(),
+});
 
-// const loadContractData = async () => {
-//   fundingGoal.value = (await contract.value!.fundingGoal()).toString()
-//   totalContributed.value = (await contract.value!.totalContributed()).toString()
-//   timeLeft.value = Number(await contract.value!.getTimeLeft())
-// }
+const state = reactive({
+  amount: 0,
+});
 
-// const connect = async () => {
-//   await (window as any).ethereum.request({ method: 'eth_requestAccounts' })
-//   const s = await provider.getSigner()
-//   signer.value = s;
-//   const addr = await s.getAddress()
-//     connectedAccount.value = addr
-//     isConnected.value = true
-//   contract.value = new ethers.Contract(contractAddress, contractABI, signer.value)
-//   await loadContractData()
-// }
+const ownerAddress = ref<string | null>(null);
+const isOwner = computed(() => {
+  return (
+    accountStore?.account?.toLowerCase() === ownerAddress.value?.toLowerCase()
+  );
+});
 
-// const connectWallet = async () => {
-//   try {
-//     await (window as any).ethereum.request({ method: 'eth_requestAccounts' })
-//     const s = await provider.getSigner()
-//     signer.value = s
-//     const addr = await s.getAddress()
-//     connectedAccount.value = addr
-//     isConnected.value = true
-//     contract.value = new ethers.Contract(contractAddress, contractABI, signer.value)
+const progress: any = computed(() => {
+  if (fundingGoal.value === "0") return 0;
+  const goal = Number(ethers.formatEther(fundingGoal.value));
+  const total = Number(ethers.formatEther(totalContributed.value));
+  return Math.min(Math.round((total / goal) * 100), 100);
+});
 
-//     await loadContractData()
-//     await loadMilestones()
-//     listenToEvents()
-//   } catch (e) {
-//     toast.add({ title: 'Connection failed', color: 'red' })
-//     console.error(e)
-//   }
-// }
+const dashOffset = computed(() => {
+  const circumference = 2 * Math.PI * 45;
+  return circumference - (progress / 100) * circumference;
+});
 
-// // Actions
-// const contribute = async () => {
-//   try {
-//     const tx = await contract.value!.contribute({
-//       value: ethers.parseEther(contributeAmount.value!.toString())
-//     })
-//     await tx.wait()
-//     toast.add({ title: 'Contribution successful!', color: 'primary', position: "top-right", })
-//     await loadContractData()
-//   } catch (e) {
-//     toast.add({ title: 'Contribution failed', color: 'red', position: "top-right", })
-//     console.error(e)
-//   }
-// }
+const loadOwner = async () => {
+  const contract = await getEthereumContract();
+  ownerAddress.value = await contract!.owner();
+};
 
-// const withdraw = async () => {
-//   try {
-//     const tx = await contract.value!.withdraw()
-//     await tx.wait()
-//     toast.add({ title: 'Withdraw successful', color: 'green', position: "top-right", })
-//     await loadContractData()
-//   } catch (e) {
-//     toast.add({ title: 'Withdraw failed', color: 'red', position: "top-right", })
-//     console.error(e)
-//   }
-// }
+const loadContractData = async () => {
+  const contract: any = await getEthereumContract();
+  fundingGoal.value = (await contract!.fundingGoal()).toString();
+  totalContributed.value = (await contract!.totalContributed()).toString();
+  timeLeft.value = Number(await contract!.getTimeLeft());
+  contributors.value = await contract!.getContributors();
+};
 
-// const refund = async () => {
-//   try {
-//     const tx = await contract.value!.refund()
-//     await tx.wait()
-//     toast.add({ title: 'Refund successful', color: 'yellow', position: "top-right", })
-//     await loadContractData()
-//   } catch (e) {
-//     toast.add({ title: 'Refund failed', color: 'red', position: "top-right", })
-//     console.error(e)
-//   }
-// }
+const handContribute = async (event: FormSubmitEvent<typeof state>) => {
+  loading.value = true;
+  try {
+    await contribute(state.amount);
+    toast.add({
+      title: "Success!",
+      description: `You contributed ${state.amount} ETH.`,
+      color: "success",
+      icon: "i-lucide-check",
+      position: "top-right",
+    });
+    state.amount = 0; // Reset input
+    loadContractData(); // Refresh data
+  } catch (error) {
+    toast.add({
+      title: "Error",
+      description: "Contribution failed. Please try again.",
+      icon: "i-lucide-check",
+      color: "danger",
+      position: "top-right",
+    });
+  } finally {
+    loading.value = false;
+  }
+};
 
-// const pause = async () => {
-//   try {
-//     const tx = await contract.value!.pause()
-//     await tx.wait()
-//     toast.add({ title: 'Campaign paused', color: 'red', position: "top-right", })
-//   } catch (e) {
-//     toast.add({ title: 'Pause failed', color: 'red', position: "top-right", })
-//     console.error(e)
-//   }
-// }
-
-// const resume = async () => {
-//   try {
-//     const tx = await contract.value!.resume()
-//     await tx.wait()
-//     toast.add({ title: 'Campaign resumed', color: 'purple', position: "top-right", })
-//   } catch (e) {
-//     toast.add({ title: 'Resume failed', color: 'red', position: "top-right", })
-//     console.error(e)
-//   }
-// }
-
-// const listenToEvents = async () => {
-//   contract.value!.on('Contribution', (contributor, amount, event) => {
-//     history.value.unshift({
-//       type: 'Contribution',
-//       from: contributor,
-//       amount: ethers.formatEther(amount),
-//       tx: event.transactionHash
-//     })
-//   })
-
-//   contract.value!.on('Refund', (contributor, amount, event) => {
-//     history.value.unshift({
-//       type: 'Refund',
-//       from: contributor,
-//       amount: ethers.formatEther(amount),
-//       tx: event.transactionHash
-//     })
-//   })
-
-//   contract.value!.on('Withdrawal', (owner, amount, event) => {
-//     history.value.unshift({
-//       type: 'Withdrawal',
-//       from: owner,
-//       amount: ethers.formatEther(amount),
-//       tx: event.transactionHash
-//     })
-//   })
-// }
-
-
-// onMounted(() => {
-//   connect()
-//   // Auto refresh
-//   setInterval(loadContractData, 5000)
-// });
+onMounted(() => {
+  loadOwner();
+  connectAccount();
+  // Auto refresh
+  loadContractData();
+});
 
 // onUnmounted(() => {
-//   contract.value?.removeAllListeners()
-// })
+//   contract?.removeAllListeners();
+// });
 
-const formatEther = (val: string) => ethers.formatEther(val)
+const formatEther = (val: any) => ethers.formatEther(val);
 </script>

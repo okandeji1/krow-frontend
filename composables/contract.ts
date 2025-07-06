@@ -1,25 +1,16 @@
 import { ethers } from "ethers";
-import { getEthereumContract } from "~/utils/utility";
+import { ethereum, getEthereumContract } from "~/utils/utility";
 
-export const contribute = async (contributeAmount: any) => {
+export const contribute = async (amount: any) => {
+  if (!ethereum) return alert("Please install metamask!");
+
   try {
     const contract: any = await getEthereumContract();
     const tx = await contract!.contribute({
-      value: ethers.parseEther(contributeAmount!.toString()),
+      value: ethers.parseEther(amount!.toString()),
     });
     await tx.wait();
-    // toast.add({
-    //   title: "Contribution successful!",
-    //   color: "primary",
-    //   position: "top-right",
-    // });
-    // await loadContractData();
   } catch (e) {
-    // toast.add({
-    //   title: "Contribution failed",
-    //   color: "red",
-    //   position: "top-right",
-    // });
     console.error(e);
   }
 };
