@@ -11,12 +11,19 @@ export const getEthereumContract = async () => {
     if (!ethereum) return alert("Please install metamask!");
 
     // Local deployment
-    const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545")
-    // const provider = new ethers.BrowserProvider(ethereum);
-    const signer = await provider.getSigner();
-    const contract: ethers.Contract = new ethers.Contract(contractAddress, contractABI, signer);
+    // const provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545")
+    if (typeof window !== "undefined") {
+      // Safe to use window, self, ethers, MetaMask
+      const provider = new ethers.BrowserProvider(ethereum);
+      const signer = await provider.getSigner();
+      const contract: ethers.Contract = new ethers.Contract(
+        contractAddress,
+        contractABI,
+        signer
+      );
 
-    return contract;
+      return contract;
+    }
   } catch (e) {
     console.error(e);
   }
@@ -26,7 +33,7 @@ export const connect = async () => {
   try {
     if (!ethereum) return alert("Please install metamask!");
 
-    const accounts = await ethereum.request({
+    const accounts = await ethereum?.request({
       method: "eth_requestAccounts",
     });
     return accounts[0];
@@ -35,7 +42,7 @@ export const connect = async () => {
   }
 };
 
-export const formatTimestamp = (bigintTs: bigint): string =>{
+export const formatTimestamp = (bigintTs: bigint): string => {
   const date = new Date(Number(bigintTs) * 1000);
   return date.toLocaleString("en-US", {
     day: "numeric",
@@ -43,6 +50,6 @@ export const formatTimestamp = (bigintTs: bigint): string =>{
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false
+    hour12: false,
   });
-}
+};

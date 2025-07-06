@@ -1,5 +1,5 @@
 <template>
-  <navbar />
+  <lazy-navbar />
   <section
     class="min-h-screen flex flex-col items-center justify-center text-white p-6 space-y-8"
     style="
@@ -66,31 +66,33 @@
       </div>
     </div>
 
-    <div class="flex flex-wrap justify-center space-x-2 mt-4">
+    <div class="flex justify-center space-x-2 mt-4">
       <UForm
         :schema="schema"
         :state="state"
-        @submit="handContribute"
-        class="space-y-4"
+        @submit="handleContribute"
+        class="space-y-4 flex flex-col items-center justify-center"
       >
-        <UInput
-          highlight
-          color="neutral"
-          size="xl"
-          v-model="state.amount"
-          type="number"
-          placeholder="Enter amount"
-          class="rounded-lg p-2 text-black"
-        />
+        <UFormField name="amount">
+          <UInput
+            highlight
+            color="neutral"
+            size="xl"
+            v-model="state.amount"
+            type="number"
+            placeholder="Enter amount"
+            class="rounded-lg p-2 text-black"
+          />
+        </UFormField>
         <UButton
           type="submit"
-          class="cursor-pointer"
+          class="cursor-pointer p-3 w-64 font-bold text-xl"
           color="neutral"
           icon="i-lucide-rocket"
-          size="md"
-          variant="ghost"
+          variant="solid"
           :loading="loading"
-        />
+          >Fund
+        </UButton>
       </UForm>
     </div>
 
@@ -117,11 +119,11 @@
       </UCard>
     </div>
   </section>
-  <Footer />
+  <lazy-footer />
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, onUnmounted, reactive } from "vue";
+import { ref, onMounted, computed, reactive } from "vue";
 import { ethers } from "ethers";
 import { useAccountStore } from "~/stores/account";
 import { formatTimestamp, getEthereumContract } from "~/utils/utility";
@@ -172,7 +174,7 @@ const schema = Joi.object({
 });
 
 const state = reactive({
-  amount: 0,
+  amount: null as number | null,
 });
 
 const ownerAddress = ref<string | null>(null);
@@ -207,7 +209,7 @@ const loadContractData = async () => {
   contributors.value = await contract!.getContributors();
 };
 
-const handContribute = async (event: FormSubmitEvent<typeof state>) => {
+const handleContribute = async (event: FormSubmitEvent<typeof state>) => {
   loading.value = true;
   try {
     await contribute(state.amount);
@@ -218,8 +220,8 @@ const handContribute = async (event: FormSubmitEvent<typeof state>) => {
       icon: "i-lucide-check",
       position: "top-right",
     });
-    state.amount = 0; // Reset input
-    loadContractData(); // Refresh data
+    state.amount = null;
+    loadContractData();
   } catch (error) {
     toast.add({
       title: "Error",
@@ -228,7 +230,7 @@ const handContribute = async (event: FormSubmitEvent<typeof state>) => {
       color: "danger",
       position: "top-right",
     });
-  } finally {
+  }finally {
     loading.value = false;
   }
 };
