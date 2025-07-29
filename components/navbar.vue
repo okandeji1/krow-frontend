@@ -23,12 +23,12 @@
       <UButton
         color="white"
         variant="outline"
-        v-if="!accountStore.account"
+        v-if="!accountStore?.account"
         @click="connectWallet"
         >Connect Wallet</UButton
       >
       <span v-else class="text-sm text-gray-500">
-        Connected: {{ shortenAddress(accountStore.account) }}
+        Connected: {{ shortenAddress(accountStore?.account) }}
       </span>
     </div>
 
@@ -74,8 +74,10 @@ import { ref } from "vue";
 import { shortenAddress } from "~/utils/utility";
 import { useAccountStore } from "~/stores/account";
 import { connectAccount } from "~/composables/accountAuth";
+import { useRouter } from "vue-router";
 
 const accountStore = useAccountStore();
+const router = useRouter();
 
 const menuOpen = ref(false);
 
@@ -85,5 +87,6 @@ const toggleMenu = () => {
 
 const connectWallet = async () => {
   await connectAccount();
+  router.push("/"); // Redirect to home after connecting
 };
 </script>

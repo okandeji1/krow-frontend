@@ -10,9 +10,7 @@ export const contribute = async (amount: any) => {
       value: ethers.parseEther(amount!.toString()),
     });
     await tx.wait();
-  } catch (e) {
-    console.error(e);
-  }
+  } catch (e) {}
 };
 
 export const getContributors = async () => {

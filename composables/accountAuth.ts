@@ -6,11 +6,6 @@ export const connectAccount = async () => {
   try {
     const account = await connect();
 
-    accountStore.setAccount(account);
-
-    return window.location.reload();
-
-  } catch (error) {
-    console.error("Error connecting to account:", error);
-  }
+    return accountStore.setAccount(account);
+  } catch (error) {}
 };
