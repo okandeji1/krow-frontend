@@ -85,6 +85,5 @@ const toggleMenu = () => {
 
 const connectWallet = async () => {
   await connectAccount();
-  window.location.reload();
 };
 </script>
